@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Uganda Legal Documents — Admin Panel</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<!-- CSP that allows GitHub API + raw image previews -->
+<meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  base-uri 'self';
+  frame-ancestors 'none';
+  connect-src 'self' https://api.github.com;
+  img-src 'self' data: blob: https://raw.githubusercontent.com;
+  script-src 'self' 'unsafe-inline';
+  style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+  font-src https://fonts.gstatic.com;
+  upgrade-insecure-requests">
+
+<meta http-equiv="Referrer-Policy" content="no-referrer"/>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+<style>
+  :root{--ink:#0f172a;--muted:#64748b;--line:#e2e8f0;--brand:#1a365d;--ok:#16a34a;--bad:#c53030;--card:#fff;--bg:#f7fafc}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+  header{position:sticky;top:0;background:#fff;border-bottom:1px solid var(--line);padding:12px 16px;z-index:10}
+  .wrap{max-width:1100px;margin:0 auto;padding:16px}
+  .grid{display:grid;grid-template-columns:2fr 3fr;gap:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  .card .body{padding:14px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  label{font-weight:700;font-size:14px}
+  input,select,textarea{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font-size:16px}
+  .muted{color:var(--muted)}
+  .button{padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:#fff;font-weight:700;cursor:pointer}
+  .primary{background:var(--brand);border-color:var(--brand);color:#fff}
+  .ok{background:var(--ok);border-color:var(--ok);color:#fff}
+  .bad{background:var(--bad);border-color:var(--bad);color:#fff}
+  .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .tag{display:inline-block;background:#1a365d0f;border:1px solid #a7c5e0;color:#1a365d;font-weight:800;padding:3px 8px;border-radius:999px}
+  .small{font-size:12px}
+  .preview{position:relative;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:#f8fafc}
+  .preview img{width:100%;height:160px;object-fit:cover;display:block;background:#f1f5f9}
+  .rm{position:absolute;top:6px;right:6px;z-index:2}
+  .loading{display:flex;align-items:center;justify-content:center;height:160px;color:var(--muted);font-size:14px}
+  .list{display:grid;gap:8px}
+  .list .item{border:1px dashed var(--line);border-radius:10px;padding:10px}
+  .code{white-space:pre-wrap;word-break:break-word;background:#f8fafc;border:1px solid var(--line);padding:10px;border-radius:10px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;max-height:220px;overflow:auto}
+  
+  /* Token input modal styles */
+  .token-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 16px;
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+  }
+  
+  .token-modal {
+    background: var(--card);
+    border-radius: 16px;
+    width: 100%;
+    max-width: 400px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    border: 1px solid var(--line);
+    overflow: hidden;
+    max-height: 90vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .token-modal .header {
+    padding: 16px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .token-modal .header h3 {
+    margin: 0;
+    font-size: 18px;
+  }
+  
+  .token-modal .body {
+    padding: 16px;
+  }
+  
+  .token-modal .footer {
+    padding: 16px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+  }
+  
+  .token-modal textarea {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 14px;
+    min-height: 100px;
+    resize: vertical;
+  }
+  
+  .token-info {
+    background: #f0f9ff;
+    border: 1px solid #bae6fd;
+    border-radius: 8px;
+    padding: 10px;
+    margin-bottom: 12px;
+    font-size: 12px;
+    color: #0369a1;
+  }
+  
+  .categories-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-top: 8px;
+  }
+  
+  .category-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  
+  .category-option input {
+    width: auto;
+  }
+  
+  .stat-badge {
+    display: inline-block;
+    background: #1a365d;
+    color: white;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin-left: 6px;
+  }
+  
+  @media (max-width:900px){ .grid{grid-template-columns:1fr} }
+  @media (max-width:768px){ 
+    .row{grid-template-columns:1fr}
+    .categories-grid{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+    <strong>Uganda Legal Documents — Admin Panel</strong>
+    <div class="bar">
+      <button id="setTokenBtn" class="button">Set GitHub Token</button>
+      <button id="setSessionBtn" class="button">Use Session</button>
+      <button id="clearTokenBtn" class="button bad">Clear Token</button>
+      <span id="tokenState" class="tag">No token</span>
+    </div>
+  </div>
+</header>
+
+<!-- Token Input Modal -->
+<div id="tokenModal" class="token-modal-overlay">
+  <div class="token-modal">
+    <div class="header">
+      <h3>Set GitHub Token</h3>
+      <button id="closeTokenModal" class="button" style="font-size: 20px; padding: 4px 10px;">×</button>
+    </div>
+    <div class="body">
+      <div class="token-info">
+        <strong>GitHub Personal Access Token Required</strong><br>
+        Create a fine-grained token with read/write permissions for this repository. The token will be stored locally in your browser.
+      </div>
+      <label for="tokenInput">Paste your GitHub token:</label>
+      <textarea id="tokenInput" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+      <div class="muted small" style="margin-top: 6px;">
+        • Token is saved locally (or in session if enabled)<br>
+        • Never share your token with anyone
+      </div>
+    </div>
+    <div class="footer">
+      <button id="cancelTokenBtn" class="button">Cancel</button>
+      <button id="saveTokenBtn" class="button primary">Save Token</button>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <!-- CONFIG -->
+  <div class="card" style="margin-bottom:12px">
+    <div class="body">
+      <h3 style="margin:0 0 8px">CONFIGURATION – EDIT THESE VALUES</h3>
+      <div class="row">
+        <div><label>GitHub Owner</label><input id="cfgOwner" placeholder="e.g., your-username"></div>
+        <div><label>GitHub Repository</label><input id="cfgRepo" placeholder="e.g., uganda-legal-docs"></div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <div><label>Branch</label><input id="cfgBranch" placeholder="main"></div>
+        <div><label>Documents JSON path</label><input id="cfgDocuments" placeholder="documents.json"></div>
+      </div>
+      <div class="muted small" style="margin-top:6px">Values are saved locally (or in session mode if enabled).</div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <!-- LEFT: FORM -->
+    <div class="card">
+      <div class="body">
+        <h2 id="formTitle" style="margin:0 0 10px">New Legal Document <span id="editBadge" class="tag" style="display:none">Editing</span></h2>
+        <div class="row">
+          <div>
+            <label>Document Title</label>
+            <input id="dTitle" placeholder="e.g., Administration General Act Cap 264">
+          </div>
+          <div>
+            <label>Year</label>
+            <input id="dYear" type="number" placeholder="2024" value="2024">
+          </div>
+        </div>
+        
+        <div style="margin-top:8px">
+          <label>Category</label>
+          <div class="categories-grid">
+            <div class="category-option"><input type="radio" name="category" value="constitutional" checked> Constitutional Law</div>
+            <div class="category-option"><input type="radio" name="category" value="criminal"> Criminal Law</div>
+            <div class="category-option"><input type="radio" name="category" value="civil"> Civil Law</div>
+            <div class="category-option"><input type="radio" name="category" value="commercial"> Commercial Law</div>
+            <div class="category-option"><input type="radio" name="category" value="family"> Family Law</div>
+            <div class="category-option"><input type="radio" name="category" value="property"> Property Law</div>
+            <div class="category-option"><input type="radio" name="category" value="evidence"> Evidence Law</div>
+            <div class="category-option"><input type="radio" name="category" value="procedure"> Procedure</div>
+            <div class="category-option"><input type="radio" name="category" value="judicature"> Judicature</div>
+            <div class="category-option"><input type="radio" name="category" value="magistrate"> Magistrate Courts</div>
+            <div class="category-option"><input type="radio" name="category" value="administrative"> Administrative Law</div>
+            <div class="category-option"><input type="radio" name="category" value="employment"> Employment Law</div>
+            <div class="category-option"><input type="radio" name="category" value="international"> International Law</div>
+            <div class="category-option"><input type="radio" name="category" value="other"> Other Acts</div>
+          </div>
+        </div>
+        
+        <div style="margin-top:8px">
+          <label>Description</label>
+          <textarea id="dDesc" rows="3" placeholder="Document description..."></textarea>
+        </div>
+        
+        <div class="row" style="margin-top:8px">
+          <div>
+            <label>PDF Filename</label>
+            <input id="dFilename" placeholder="e.g., Administration_General_Act_Cap_264.pdf">
+          </div>
+          <div>
+            <label>Size (MB)</label>
+            <input id="dSize" placeholder="e.g., 1.8" step="0.1">
+          </div>
+        </div>
+        
+        <div class="row" style="margin-top:8px">
+          <div>
+            <label>Pages</label>
+            <input id="dPages" type="number" placeholder="45">
+          </div>
+          <div>
+            <label>Date Added</label>
+            <input id="dDate" type="date" value="">
+          </div>
+        </div>
+        
+        <div style="margin-top:8px">
+          <label class="bar" style="align-items:center;gap:6px">
+            <input type="checkbox" id="dUpdated"> Mark as recently updated
+          </label>
+        </div>
+
+        <div class="bar" style="margin-top:14px">
+          <button id="publishBtn" class="button primary" type="button">Publish to GitHub</button>
+          <button id="updateBtn" class="button ok" type="button" style="display:none">Update Document</button>
+          <button id="resetBtn" class="button" type="button">Reset Form</button>
+        </div>
+        <div id="status" class="muted small" style="margin-top:8px"></div>
+      </div>
+    </div>
+
+    <!-- RIGHT: MANAGE -->
+    <div class="card">
+      <div class="body">
+        <h3 style="margin:0 0 10px">Manage Legal Documents (GitHub)<span class="stat-badge" id="docCount">0</span></h3>
+        <div class="bar" style="margin-bottom:8px">
+          <button id="refreshBtn" class="button" type="button">Refresh List</button>
+          <span style="flex:1"></span>
+          <button id="exportBtn" class="button" type="button">Export JSON</button>
+          <button id="importBtn" class="button" type="button">Import JSON</button>
+          <input id="importInput" type="file" accept="application/json" style="display:none">
+        </div>
+        <div id="docList" class="list"></div>
+
+        <h3 style="margin:16px 0 10px">Last Action</h3>
+        <div id="preview" class="list"></div>
+
+        <h4 style="margin:14px 0 6px">Activity Log</h4>
+        <div id="log" class="code"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===========================
+   Uganda Legal Documents Admin Panel
+   =========================== */
+
+/* --- STORAGE KEYS --- */
+const TOKEN_KEY = "UGANDA_LEGAL_GH_TOKEN_V1";
+const CFG_KEY   = "UGANDA_LEGAL_ADMIN_CFG_V1";
+const SESSION_ONLY_KEY = "UGANDA_LEGAL_SESSION_ONLY";
+
+/* --- DEFAULT CONFIG --- */
+const defaultCfg = {
+  owner: "your-username",
+  repo: "uganda-legal-docs",
+  branch: "main",
+  documentsPath: "documents.json"
+};
+
+/* --- CATEGORY MAPPING --- */
+const categoryNames = {
+    constitutional: "Constitutional Law",
+    criminal: "Criminal Law",
+    civil: "Civil Law",
+    commercial: "Commercial Law",
+    family: "Family Law",
+    property: "Property Law",
+    evidence: "Evidence Law",
+    procedure: "Procedure",
+    judicature: "Judicature",
+    magistrate: "Magistrate Courts",
+    administrative: "Administrative Law",
+    employment: "Employment Law",
+    international: "International Law",
+    other: "Other Acts"
+};
+
+/* --- DOM REFS --- */
+const tokenState = document.getElementById('tokenState');
+const setTokenBtn = document.getElementById('setTokenBtn');
+const setSessionBtn = document.getElementById('setSessionBtn');
+const clearTokenBtn = document.getElementById('clearTokenBtn');
+const docCount = document.getElementById('docCount');
+
+// Token modal elements
+const tokenModal = document.getElementById('tokenModal');
+const tokenInput = document.getElementById('tokenInput');
+const closeTokenModal = document.getElementById('closeTokenModal');
+const cancelTokenBtn = document.getElementById('cancelTokenBtn');
+const saveTokenBtn = document.getElementById('saveTokenBtn');
+
+const cfgOwner = document.getElementById('cfgOwner');
+const cfgRepo = document.getElementById('cfgRepo');
+const cfgBranch = document.getElementById('cfgBranch');
+const cfgDocuments = document.getElementById('cfgDocuments');
+
+const publishBtn = document.getElementById('publishBtn');
+const updateBtn = document.getElementById('updateBtn');
+const resetBtn = document.getElementById('resetBtn');
+const statusEl = document.getElementById('status');
+const logEl = document.getElementById('log');
+const previewEl = document.getElementById('preview');
+
+const refreshBtn = document.getElementById('refreshBtn');
+const docList = document.getElementById('docList');
+const exportBtn = document.getElementById('exportBtn');
+const importBtn = document.getElementById('importBtn');
+const importInput = document.getElementById('importInput');
+
+const formTitle = document.getElementById('formTitle');
+const editBadge = document.getElementById('editBadge');
+
+/* Form refs */
+const dTitle = document.getElementById('dTitle');
+const dYear = document.getElementById('dYear');
+const dDesc = document.getElementById('dDesc');
+const dFilename = document.getElementById('dFilename');
+const dSize = document.getElementById('dSize');
+const dPages = document.getElementById('dPages');
+const dDate = document.getElementById('dDate');
+const dUpdated = document.getElementById('dUpdated');
+
+/* --- STATE --- */
+let editingId = null; // id being edited
+
+/* --- HELPERS --- */
+const API_BASE = "https://api.github.com";
+
+function log(msg){ 
+  const timestamp = new Date().toLocaleTimeString();
+  logEl.textContent += `[${timestamp}] ${msg}\n`; 
+  logEl.scrollTop = logEl.scrollHeight; 
+}
+
+function setStatus(msg){ statusEl.textContent = msg; }
+
+function useSession(){ return sessionStorage.getItem(SESSION_ONLY_KEY) === '1'; }
+function storage(){ return useSession() ? sessionStorage : localStorage; }
+function saveCfg(cfg){ storage().setItem(CFG_KEY, JSON.stringify(cfg)); }
+function loadCfg(){ try{ return {...defaultCfg, ...JSON.parse(storage().getItem(CFG_KEY)||"{}")}; }catch{ return {...defaultCfg}; } }
+function setToken(tok){ storage().setItem(TOKEN_KEY, tok); tokenOk(); }
+function getToken(){ return storage().getItem(TOKEN_KEY) || ""; }
+
+function tokenOk(stateText){
+  const t = getToken();
+  tokenState.textContent = stateText || (t ? (useSession()? "Token (session)":"Token set") : "No token");
+  tokenState.style.background = t ? "#dcfce7" : "#1a365d0f";
+}
+
+function currentCfg(){
+  return {
+    owner: (cfgOwner?.value || defaultCfg.owner).trim(),
+    repo: (cfgRepo?.value || defaultCfg.repo).trim(),
+    branch: (cfgBranch?.value || defaultCfg.branch).trim(),
+    documentsPath: (cfgDocuments?.value || defaultCfg.documentsPath).trim()
+  };
+}
+
+function slugify(s){ 
+  return String(s||"").toLowerCase()
+    .replace(/[^a-z0-9]+/g,"-")
+    .replace(/^-+|-+$/g,"")
+    .slice(0,50) || "document"; 
+}
+
+function toBase64Utf8(str){ return btoa(unescape(encodeURIComponent(str))); }
+function fromBase64Utf8(b64){ return decodeURIComponent(escape(atob(b64.replace(/\n/g,'')))); }
+
+function ghHeaders(){
+  const h = {
+    "Accept": "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28"
+  };
+  const t = getToken();
+  if (t) h["Authorization"] = "Bearer " + t;
+  return h;
+}
+
+/* --- TOKEN MODAL FUNCTIONS --- */
+function showTokenModal() {
+  tokenModal.style.display = 'flex';
+  tokenInput.value = '';
+  setTimeout(() => {
+    tokenInput.focus();
+    tokenModal.scrollTop = 0;
+  }, 100);
+}
+
+function hideTokenModal() {
+  tokenModal.style.display = 'none';
+  tokenInput.value = '';
+}
+
+async function saveTokenFromModal() {
+  const token = tokenInput.value.trim();
+  if (!token) {
+    alert("Please enter a GitHub token.");
+    return;
+  }
+  
+  setToken(token);
+  hideTokenModal();
+  
+  setStatus("Testing token…");
+  const ok = await verifyTokenAccess();
+  setStatus(ok ? "Token OK" : "Token invalid for repo");
+}
+
+/* GitHub API */
+async function ghGetContents(path, cfg=currentCfg()){
+  const url = `${API_BASE}/repos/${cfg.owner}/${cfg.repo}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(cfg.branch)}`;
+  const r = await fetch(url, {headers: ghHeaders()});
+  if (r.status === 404) return {status:404};
+  if (!r.ok) throw new Error(`GET ${path} failed: ${r.status} ${await r.text()}`);
+  return await r.json();
+}
+
+async function ghPutContents(path, base64Content, message, sha=null, cfg=currentCfg()){
+  const url = `${API_BASE}/repos/${cfg.owner}/${cfg.repo}/contents/${encodeURIComponent(path)}`;
+  const body = { message, content: base64Content, branch: cfg.branch };
+  if (sha) body.sha = sha;
+  const r = await fetch(url, { method: "PUT", headers: {...ghHeaders(), "Content-Type":"application/json"}, body: JSON.stringify(body) });
+  if (!r.ok) throw new Error(`PUT ${path} failed: ${r.status} ${await r.text()}`);
+  return await r.json();
+}
+
+async function ghDeleteContents(path, message, sha, cfg=currentCfg()){
+  const url = `${API_BASE}/repos/${cfg.owner}/${cfg.repo}/contents/${encodeURIComponent(path)}`;
+  const r = await fetch(url, { method: "DELETE", headers: {...ghHeaders(), "Content-Type":"application/json"}, body: JSON.stringify({ message, sha, branch: cfg.branch }) });
+  if (!r.ok) throw new Error(`DELETE ${path} failed: ${r.status} ${await r.text()}`);
+  return await r.json();
+}
+
+/* Token quick test */
+async function verifyTokenAccess(){
+  try{
+    const cfg = currentCfg();
+    const r = await fetch(`${API_BASE}/repos/${cfg.owner}/${cfg.repo}`, {headers: ghHeaders()});
+    if (!r.ok) { tokenOk("Token invalid for repo"); return false; }
+    tokenOk("Token OK");
+    return true;
+  }catch{
+    tokenOk("Token check failed");
+    return false;
+  }
+}
+
+/* Documents.json */
+async function loadDocumentsJson(){
+  const got = await ghGetContents(currentCfg().documentsPath);
+  if (got.status === 404) return { arr: [], sha: null };
+  const sha = got.sha;
+  const text = fromBase64Utf8(got.content);
+  let arr = [];
+  try{ arr = JSON.parse(text); if(!Array.isArray(arr)) arr=[]; }catch{ arr=[]; }
+  return { arr, sha };
+}
+
+function renderDocumentsAdmin(arr){
+  if (!Array.isArray(arr) || !arr.length){
+    docList.innerHTML = '<div class="muted small">No documents found in documents.json.</div>';
+    docCount.textContent = '0';
+    return;
+  }
+  
+  docCount.textContent = arr.length;
+  docList.replaceChildren();
+  
+  arr.forEach(doc=>{
+    const item = document.createElement('div'); 
+    item.className='item'; 
+    item.dataset.id=doc.id;
+    
+    const top = document.createElement('div'); 
+    top.className='bar'; 
+    top.style.justifyContent='space-between'; 
+    top.style.alignItems='flex-start';
+    top.style.marginBottom='6px';
+
+    const left = document.createElement('div');
+    const name = document.createElement('div');
+    const strong = document.createElement('strong'); 
+    strong.textContent = doc.title;
+    const smallId = document.createElement('span'); 
+    smallId.className='muted small'; 
+    smallId.textContent = ` (ID: ${doc.id})`;
+    name.appendChild(strong); 
+    name.appendChild(smallId);
+    
+    const meta = document.createElement('div'); 
+    meta.className='muted small'; 
+    meta.textContent = `Category: ${categoryNames[doc.category]||doc.category} • Year: ${doc.year} • Size: ${doc.size}MB • Pages: ${doc.pages}`;
+    
+    const desc = document.createElement('div'); 
+    desc.className='muted small'; 
+    desc.textContent = (doc.description||'').slice(0,140);
+    
+    left.appendChild(name); 
+    left.appendChild(meta); 
+    left.appendChild(desc);
+
+    const right = document.createElement('div'); 
+    right.className='bar';
+    
+    const editBtn = document.createElement('button'); 
+    editBtn.className='button ok'; 
+    editBtn.textContent='Edit'; 
+    editBtn.onclick=()=>startEdit(doc);
+    
+    const delBtn = document.createElement('button'); 
+    delBtn.className='button bad'; 
+    delBtn.textContent='Delete'; 
+    delBtn.onclick=()=>deleteDocument(doc.id);
+    
+    right.appendChild(editBtn); 
+    right.appendChild(delBtn);
+
+    top.appendChild(left); 
+    top.appendChild(right);
+    item.appendChild(top);
+    
+    const filenameDiv = document.createElement('div'); 
+    filenameDiv.className='muted small'; 
+    filenameDiv.style.marginTop='4px';
+    filenameDiv.textContent = `Filename: ${doc.filename}`;
+    item.appendChild(filenameDiv);
+    
+    docList.appendChild(item);
+  });
+}
+
+/* Editing */
+function startEdit(doc){
+  editingId = doc.id; 
+  formTitle.textContent='Edit Document'; 
+  editBadge.style.display='inline-block';
+  publishBtn.style.display='none'; 
+  updateBtn.style.display='inline-block';
+  
+  dTitle.value = doc.title || '';
+  dYear.value = doc.year || new Date().getFullYear();
+  dDesc.value = doc.description || '';
+  dFilename.value = doc.filename || '';
+  dSize.value = doc.size || '';
+  dPages.value = doc.pages || '';
+  dDate.value = doc.date || new Date().toISOString().split('T')[0];
+  dUpdated.checked = doc.updated || false;
+  
+  // Set category radio button
+  const categoryRadios = document.querySelectorAll('input[name="category"]');
+  categoryRadios.forEach(radio => {
+    radio.checked = radio.value === (doc.category || 'constitutional');
+  });
+  
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+
+function resetForm(){
+  editingId=null; 
+  formTitle.textContent='New Legal Document'; 
+  editBadge.style.display='none';
+  publishBtn.style.display='inline-block'; 
+  updateBtn.style.display='none';
+  
+  dTitle.value = "";
+  dYear.value = new Date().getFullYear();
+  dDesc.value = "";
+  dFilename.value = "";
+  dSize.value = "";
+  dPages.value = "";
+  dDate.value = new Date().toISOString().split('T')[0];
+  dUpdated.checked = false;
+  
+  // Reset category to constitutional
+  const constitutionalRadio = document.querySelector('input[name="category"][value="constitutional"]');
+  if (constitutionalRadio) constitutionalRadio.checked = true;
+  
+  setStatus('');
+}
+
+resetBtn.addEventListener('click', resetForm);
+
+/* Publish (Create) */
+publishBtn.addEventListener('click', async ()=>{
+  try{
+    if (!getToken()){ alert("Set your GitHub token first."); return; }
+    const title = dTitle.value.trim(); 
+    if (!title){ alert("Enter document title."); return; }
+    if (!dFilename.value.trim()){ alert("Enter PDF filename."); return; }
+
+    // verify token once
+    const ok = await verifyTokenAccess(); 
+    if (!ok){ alert("Token not authorized for this repo."); return; }
+
+    const cfg = currentCfg();
+    setStatus("Creating document…"); 
+    log("=== Starting document creation ===");
+    
+    // Get selected category
+    const categoryRadios = document.querySelectorAll('input[name="category"]');
+    let selectedCategory = 'constitutional';
+    categoryRadios.forEach(radio => {
+      if (radio.checked) selectedCategory = radio.value;
+    });
+
+    setStatus("Updating documents.json…");
+    let arr = []; 
+    let sha = null;
+    const got = await ghGetContents(cfg.documentsPath, cfg);
+    if (got.status !== 404){ 
+      sha = got.sha; 
+      try{ 
+        arr = JSON.parse(fromBase64Utf8(got.content)); 
+        if(!Array.isArray(arr)) arr=[]; 
+      }catch{ arr=[]; } 
+      log("Loaded existing documents.json"); 
+    }
+
+    // Generate new ID
+    const newId = arr.length > 0 ? Math.max(...arr.map(d => d.id)) + 1 : 1;
+    
+    const document = { 
+      id: newId, 
+      title: title,
+      description: dDesc.value.trim(),
+      filename: dFilename.value.trim(),
+      category: selectedCategory,
+      size: dSize.value.trim(),
+      pages: parseInt(dPages.value) || 0,
+      date: dDate.value,
+      updated: dUpdated.checked,
+      year: parseInt(dYear.value) || new Date().getFullYear()
+    };
+    
+    arr.push(document);
+
+    await ghPutContents(
+      cfg.documentsPath, 
+      toBase64Utf8(JSON.stringify(arr,null,2)), 
+      `Add document: ${document.title}`, 
+      sha||undefined, 
+      cfg
+    );
+    log("✓ documents.json updated on GitHub");
+    
+    setStatus("Done! Document published.");
+    
+    // Show preview
+    previewEl.innerHTML = '';
+    const it = document.createElement('div'); 
+    it.className='item';
+    it.innerHTML = `
+      <div><strong>${document.title}</strong> — ${categoryNames[document.category]||document.category}</div>
+      <div class="muted small">${document.description||''}</div>
+      <div class="muted small">Filename: ${document.filename} • Size: ${document.size}MB • Pages: ${document.pages}</div>
+    `;
+    previewEl.appendChild(it);
+
+    alert("Published successfully!");
+    await refreshDocumentsList();
+    resetForm();
+  }catch(err){ 
+    console.error(err); 
+    log(String(err)); 
+    setStatus("Error: " + err.message); 
+    alert("Publish failed:\n" + err.message); 
+  }
+});
+
+/* Update (Edit) */
+updateBtn.addEventListener('click', async ()=>{
+  try{
+    if (!editingId){ alert('Nothing to update.'); return; }
+    if (!getToken()){ alert("Set your GitHub token first."); return; }
+    if (!(await verifyTokenAccess())){ alert("Token not authorized for this repo."); return; }
+    const title = dTitle.value.trim(); 
+    if (!title){ alert("Enter document title."); return; }
+    if (!dFilename.value.trim()){ alert("Enter PDF filename."); return; }
+
+    const cfg = currentCfg();
+    setStatus("Updating document…"); 
+    log(`=== Updating document: ${editingId} ===`);
+    
+    const { arr, sha } = await loadDocumentsJson();
+    const idx = arr.findIndex(x=>x.id === editingId);
+    if (idx === -1){ alert('Document not found.'); return; }
+
+    // Get selected category
+    const categoryRadios = document.querySelectorAll('input[name="category"]');
+    let selectedCategory = 'constitutional';
+    categoryRadios.forEach(radio => {
+      if (radio.checked) selectedCategory = radio.value;
+    });
+
+    const updated = { 
+      ...arr[idx], 
+      title: title,
+      description: dDesc.value.trim(),
+      filename: dFilename.value.trim(),
+      category: selectedCategory,
+      size: dSize.value.trim(),
+      pages: parseInt(dPages.value) || 0,
+      date: dDate.value,
+      updated: dUpdated.checked,
+      year: parseInt(dYear.value) || new Date().getFullYear()
+    };
+    
+    arr[idx] = updated;
+    
+    await ghPutContents(
+      cfg.documentsPath, 
+      toBase64Utf8(JSON.stringify(arr,null,2)), 
+      `Update document: ${updated.title}`, 
+      sha||undefined, 
+      cfg
+    );
+    
+    log("✓ documents.json updated on GitHub");
+    setStatus('Updated.');
+    log('documents.json updated.');
+    
+    // Show preview
+    previewEl.innerHTML = '';
+    const it = document.createElement('div'); 
+    it.className='item';
+    it.innerHTML = `
+      <div><strong>${updated.title}</strong> — ${categoryNames[updated.category]||updated.category}</div>
+      <div class="muted small">${updated.description||''}</div>
+      <div class="muted small">Filename: ${updated.filename} • Size: ${updated.size}MB • Pages: ${updated.pages}</div>
+    `;
+    previewEl.appendChild(it);
+
+    await refreshDocumentsList();
+    resetForm();
+  }catch(err){ 
+    console.error(err); 
+    log(String(err)); 
+    setStatus("Error: " + err.message); 
+    alert("Update failed:\n" + err.message); 
+  }
+});
+
+/* Delete */
+async function deleteDocument(docId){
+  try{
+    if (!getToken()){ alert("Set your GitHub token first."); return; }
+    if (!confirm(`Delete document ID "${docId}"? This cannot be undone.\n\nNote: This only removes the entry from documents.json. The PDF file must be deleted manually from the repository.`)) return;
+    if (!(await verifyTokenAccess())){ alert("Token not authorized for this repo."); return; }
+
+    setStatus("Deleting…"); 
+    log(`=== Deleting document: ${docId} ===`);
+    
+    const cfg = currentCfg();
+    const { arr, sha } = await loadDocumentsJson();
+    const idx = arr.findIndex(p => p.id === docId);
+    if (idx === -1){ alert("Document not found."); return; }
+    
+    const docToDelete = arr[idx];
+    
+    const newArr = arr.filter(p => p.id !== docId);
+    await ghPutContents(
+      cfg.documentsPath, 
+      toBase64Utf8(JSON.stringify(newArr,null,2)), 
+      `Delete document: ${docToDelete.title}`, 
+      sha||undefined, 
+      cfg
+    );
+    
+    log(`✓ Removed document ID ${docId} from documents.json`);
+    setStatus("Deleted.");
+    
+    await refreshDocumentsList();
+  }catch(err){ 
+    console.error(err); 
+    log(String(err)); 
+    setStatus("Error: " + err.message); 
+    alert("Delete failed:\n" + err.message); 
+  }
+}
+
+/* List / Export / Import */
+async function refreshDocumentsList(){
+  try{
+    setStatus("Loading documents from GitHub…");
+    const { arr } = await loadDocumentsJson();
+    renderDocumentsAdmin(arr);
+    setStatus("Ready.");
+  }catch(err){
+    log("Load list error: " + err.message);
+    setStatus("Error loading list.");
+  }
+}
+
+exportBtn.addEventListener('click', async ()=>{
+  try{
+    const { arr } = await loadDocumentsJson();
+    const blob = new Blob([JSON.stringify(arr,null,2)], {type:'application/json'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); 
+    a.download = 'uganda-legal-documents-export.json'; 
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }catch(err){ alert('Export failed: '+err.message); }
+});
+
+importBtn.addEventListener('click', ()=> importInput.click());
+
+importInput.addEventListener('change', async (e)=>{
+  const file = e.target.files?.[0];
+  if(!file) return;
+  if(!confirm('This will replace documents.json in the repo. Continue?')) return;
+  try{
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if(!Array.isArray(data)) throw new Error('JSON must be an array');
+    
+    // Validate document structure
+    const requiredFields = ['id', 'title', 'filename', 'category'];
+    data.forEach((doc, idx) => {
+      requiredFields.forEach(field => {
+        if (!doc.hasOwnProperty(field)) {
+          throw new Error(`Document at index ${idx} missing required field: ${field}`);
+        }
+      });
+    });
+    
+    const { sha } = await loadDocumentsJson();
+    await ghPutContents(
+      currentCfg().documentsPath, 
+      toBase64Utf8(JSON.stringify(data,null,2)), 
+      `Import documents.json`, 
+      sha||undefined, 
+      currentCfg()
+    );
+    
+    alert('Imported successfully.');
+    await refreshDocumentsList();
+    importInput.value = '';
+  }catch(err){ 
+    alert('Import failed: '+err.message); 
+    importInput.value = '';
+  }
+});
+
+/* Token / Session buttons */
+setTokenBtn.addEventListener('click', showTokenModal);
+
+setSessionBtn.addEventListener('click', ()=>{
+  if(confirm('Use sessionStorage? Your token will clear when you close the tab.')){
+    sessionStorage.setItem(SESSION_ONLY_KEY,'1');
+    const localTok = localStorage.getItem(TOKEN_KEY);
+    if(localTok){ 
+      sessionStorage.setItem(TOKEN_KEY, localTok); 
+      localStorage.removeItem(TOKEN_KEY); 
+    }
+    tokenOk();
+  }
+});
+
+clearTokenBtn.addEventListener('click', ()=>{
+  localStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(TOKEN_KEY);
+  sessionStorage.removeItem(SESSION_ONLY_KEY);
+  tokenOk("No token");
+});
+
+/* Token modal event listeners */
+closeTokenModal.addEventListener('click', hideTokenModal);
+cancelTokenBtn.addEventListener('click', hideTokenModal);
+saveTokenBtn.addEventListener('click', saveTokenFromModal);
+
+// Close modal when clicking outside of it
+tokenModal.addEventListener('click', (e) => {
+  if (e.target === tokenModal) {
+    hideTokenModal();
+  }
+});
+
+// Handle Escape key to close modal
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && tokenModal.style.display === 'flex') {
+    hideTokenModal();
+  }
+});
+
+/* Config bind + load */
+(function initCfg(){
+  const cfg = loadCfg();
+  cfgOwner.value = cfg.owner;
+  cfgRepo.value = cfg.repo;
+  cfgBranch.value = cfg.branch;
+  cfgDocuments.value = cfg.documentsPath;
+})();
+
+[cfgOwner,cfgRepo,cfgBranch,cfgDocuments].forEach(el=>{
+  el.addEventListener('change', ()=> saveCfg(currentCfg()));
+});
+
+/* Set today's date as default */
+window.addEventListener('load', () => {
+  if (!dDate.value) {
+    dDate.value = new Date().toISOString().split('T')[0];
+  }
+});
+
+/* Init */
+tokenOk();
+refreshBtn.addEventListener('click', refreshDocumentsList);
+refreshDocumentsList();
+
+/* Initial message */
+log("Uganda Legal Documents Admin Panel initialized");
+log("Set your GitHub token to start managing documents.");
+</script>
+</body>
+</html>
