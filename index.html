@@ -12,7 +12,7 @@
   frame-ancestors 'none';
   connect-src 'self' https://api.github.com;
   img-src 'self' data: blob: https://raw.githubusercontent.com;
-  script-src 'self' 'unsafe-inline';
+  script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob:;
   style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
   font-src https://fonts.gstatic.com;
   upgrade-insecure-requests">
@@ -151,7 +151,94 @@
     margin-left: 6px;
   }
   
-  @media (max-width:900px){ .grid{grid-template-columns:1fr} }
+  /* PDF upload styles */
+  .upload-area {
+    border: 2px dashed var(--line);
+    border-radius: 10px;
+    padding: 20px;
+    text-align: center;
+    margin: 12px 0;
+    background: #f8fafc;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  
+  .upload-area:hover {
+    border-color: var(--brand);
+  }
+  
+  .upload-area.dragover {
+    border-color: var(--ok);
+    background: #f0fdf4;
+  }
+  
+  .upload-icon {
+    font-size: 36px;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  
+  .files-preview {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-top: 16px;
+  }
+  
+  .file-card {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px;
+    background: #fff;
+  }
+  
+  .file-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+  }
+  
+  .file-name {
+    font-weight: 600;
+    font-size: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    margin-right: 8px;
+  }
+  
+  .file-size {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  
+  .file-info {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+  
+  .progress-bar {
+    height: 4px;
+    background: var(--line);
+    border-radius: 2px;
+    margin-top: 8px;
+    overflow: hidden;
+  }
+  
+  .progress-fill {
+    height: 100%;
+    background: var(--ok);
+    width: 0%;
+    transition: width 0.3s;
+  }
+  
+  @media (max-width:900px){ 
+    .grid{grid-template-columns:1fr}
+    .files-preview{grid-template-columns:1fr}
+  }
   @media (max-width:768px){ 
     .row{grid-template-columns:1fr}
     .categories-grid{grid-template-columns:1fr}
@@ -218,19 +305,9 @@
     <!-- LEFT: FORM -->
     <div class="card">
       <div class="body">
-        <h2 id="formTitle" style="margin:0 0 10px">New Legal Document <span id="editBadge" class="tag" style="display:none">Editing</span></h2>
-        <div class="row">
-          <div>
-            <label>Document Title</label>
-            <input id="dTitle" placeholder="e.g., Administration General Act Cap 264">
-          </div>
-          <div>
-            <label>Year</label>
-            <input id="dYear" type="number" placeholder="2024" value="2024">
-          </div>
-        </div>
+        <h2 id="formTitle" style="margin:0 0 10px">Upload Legal Documents <span id="editBadge" class="tag" style="display:none">Editing</span></h2>
         
-        <div style="margin-top:8px">
+        <div style="margin-bottom:12px">
           <label>Category</label>
           <div class="categories-grid">
             <div class="category-option"><input type="radio" name="category" value="constitutional" checked> Constitutional Law</div>
@@ -249,44 +326,30 @@
             <div class="category-option"><input type="radio" name="category" value="other"> Other Acts</div>
           </div>
         </div>
-        
-        <div style="margin-top:8px">
-          <label>Description</label>
-          <textarea id="dDesc" rows="3" placeholder="Document description..."></textarea>
+
+        <!-- PDF Upload Area -->
+        <div class="upload-area" id="uploadArea">
+          <div class="upload-icon">📄</div>
+          <div><strong>Click to select PDF files or drag & drop here</strong></div>
+          <div class="muted small">Upload up to 4 PDF documents at once (Max 50MB each)</div>
+          <input type="file" id="pdfInput" accept=".pdf" multiple style="display:none">
         </div>
-        
-        <div class="row" style="margin-top:8px">
-          <div>
-            <label>PDF Filename</label>
-            <input id="dFilename" placeholder="e.g., Administration_General_Act_Cap_264.pdf">
+
+        <!-- Files Preview -->
+        <div id="filesPreview" class="files-preview"></div>
+
+        <!-- Auto-extracted info -->
+        <div id="autoInfo" style="margin-top:16px; display:none;">
+          <h4 style="margin:0 0 8px">Auto-extracted Information</h4>
+          <div class="muted small">
+            Document titles will be extracted from filenames. Year and other details will be auto-generated.
           </div>
-          <div>
-            <label>Size (MB)</label>
-            <input id="dSize" placeholder="e.g., 1.8" step="0.1">
-          </div>
-        </div>
-        
-        <div class="row" style="margin-top:8px">
-          <div>
-            <label>Pages</label>
-            <input id="dPages" type="number" placeholder="45">
-          </div>
-          <div>
-            <label>Date Added</label>
-            <input id="dDate" type="date" value="">
-          </div>
-        </div>
-        
-        <div style="margin-top:8px">
-          <label class="bar" style="align-items:center;gap:6px">
-            <input type="checkbox" id="dUpdated"> Mark as recently updated
-          </label>
         </div>
 
         <div class="bar" style="margin-top:14px">
-          <button id="publishBtn" class="button primary" type="button">Publish to GitHub</button>
+          <button id="publishBtn" class="button primary" type="button">Upload to GitHub</button>
           <button id="updateBtn" class="button ok" type="button" style="display:none">Update Document</button>
-          <button id="resetBtn" class="button" type="button">Reset Form</button>
+          <button id="resetBtn" class="button" type="button">Clear All</button>
         </div>
         <div id="status" class="muted small" style="margin-top:8px"></div>
       </div>
@@ -386,18 +449,15 @@ const importInput = document.getElementById('importInput');
 const formTitle = document.getElementById('formTitle');
 const editBadge = document.getElementById('editBadge');
 
-/* Form refs */
-const dTitle = document.getElementById('dTitle');
-const dYear = document.getElementById('dYear');
-const dDesc = document.getElementById('dDesc');
-const dFilename = document.getElementById('dFilename');
-const dSize = document.getElementById('dSize');
-const dPages = document.getElementById('dPages');
-const dDate = document.getElementById('dDate');
-const dUpdated = document.getElementById('dUpdated');
+// Upload elements
+const uploadArea = document.getElementById('uploadArea');
+const pdfInput = document.getElementById('pdfInput');
+const filesPreview = document.getElementById('filesPreview');
+const autoInfo = document.getElementById('autoInfo');
 
 /* --- STATE --- */
 let editingId = null; // id being edited
+let selectedFiles = []; // Array of {file, title, year, size, pages}
 
 /* --- HELPERS --- */
 const API_BASE = "https://api.github.com";
@@ -452,6 +512,248 @@ function ghHeaders(){
   return h;
 }
 
+/* --- PDF FILENAME PARSING --- */
+function extractDocumentInfoFromFilename(filename) {
+  // Common patterns in Uganda legal document names
+  const patterns = [
+    // Pattern: "Administration_General_Act_Cap_264.pdf"
+    /^(.+?)_(Act|ACT|act)_(Cap|CAP|cap)_(\d+)/i,
+    // Pattern: "Uganda_Penal_Code_Act_Cap_120.pdf"
+    /^(.+?)_(Code|CODE|code)_(Act|ACT|act)_(Cap|CAP|cap)_(\d+)/i,
+    // Pattern: "Evidence_Act_Cap_43.pdf"
+    /^(.+?)_(Act|ACT|act)_(Cap|CAP|cap)_(\d+)/i,
+    // Pattern: "The_Companies_Act_2012.pdf" or "Companies_Act_2012.pdf"
+    /^(.+?)_(Act|ACT|act)_(\d{4})/i,
+    // Pattern: "Contract_Act_2010_No_7.pdf"
+    /^(.+?)_(Act|ACT|act)_(\d{4})_.+/i,
+    // Pattern: "Administration_General_Act.pdf"
+    /^(.+?)_(Act|ACT|act)/i
+  ];
+
+  // Remove .pdf extension
+  const nameWithoutExt = filename.replace(/\.pdf$/i, '');
+  
+  let title = nameWithoutExt;
+  let year = new Date().getFullYear();
+  let actNumber = null;
+
+  // Try to match patterns
+  for (const pattern of patterns) {
+    const match = nameWithoutExt.match(pattern);
+    if (match) {
+      // Extract title parts
+      const parts = nameWithoutExt.split('_');
+      
+      // Create readable title (replace underscores with spaces, capitalize first letters)
+      title = parts.map(part => {
+        if (['Act', 'Cap', 'No', 'The'].includes(part) || /^\d+$/.test(part)) {
+          return part.toUpperCase();
+        }
+        return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+      }).join(' ');
+      
+      // Try to extract year from filename (look for 4-digit numbers)
+      const yearMatch = nameWithoutExt.match(/(\d{4})/);
+      if (yearMatch) {
+        year = parseInt(yearMatch[1]);
+      }
+      
+      // Try to extract Act/Cap number
+      const numberMatch = nameWithoutExt.match(/(?:Cap|CAP|cap|No|NO|no)[_\s]*(\d+)/i);
+      if (numberMatch) {
+        actNumber = numberMatch[1];
+      }
+      
+      break;
+    }
+  }
+
+  // If no pattern matched, create a nice title from filename
+  if (title === nameWithoutExt) {
+    title = nameWithoutExt.split('_')
+      .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+      .join(' ');
+  }
+
+  // Extract category from filename keywords
+  let category = 'other';
+  const lowerTitle = title.toLowerCase();
+  
+  if (lowerTitle.includes('constitution') || lowerTitle.includes('constitutional')) {
+    category = 'constitutional';
+  } else if (lowerTitle.includes('penal') || lowerTitle.includes('criminal')) {
+    category = 'criminal';
+  } else if (lowerTitle.includes('civil') || lowerTitle.includes('tort')) {
+    category = 'civil';
+  } else if (lowerTitle.includes('company') || lowerTitle.includes('commercial') || lowerTitle.includes('contract')) {
+    category = 'commercial';
+  } else if (lowerTitle.includes('family') || lowerTitle.includes('marriage') || lowerTitle.includes('divorce')) {
+    category = 'family';
+  } else if (lowerTitle.includes('property') || lowerTitle.includes('land')) {
+    category = 'property';
+  } else if (lowerTitle.includes('evidence')) {
+    category = 'evidence';
+  } else if (lowerTitle.includes('procedure') || lowerTitle.includes('procedural')) {
+    category = 'procedure';
+  }
+
+  return {
+    title: title,
+    year: year,
+    category: category,
+    actNumber: actNumber
+  };
+}
+
+/* --- FILE UPLOAD HANDLING --- */
+function readFileAsArrayBuffer(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target.result);
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+async function getPDFPageCount(file) {
+  try {
+    // Try to use PDF.js to get page count
+    if (typeof pdfjsLib === 'undefined') {
+      // Load PDF.js dynamically
+      await new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+      });
+    }
+
+    const arrayBuffer = await readFileAsArrayBuffer(file);
+    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+    const pdf = await loadingTask.promise;
+    return pdf.numPages;
+  } catch (error) {
+    console.warn('Could not get PDF page count:', error);
+    // Estimate pages based on file size (rough estimate: 50KB per page)
+    const estimatedPages = Math.max(1, Math.round(file.size / (50 * 1024)));
+    return estimatedPages;
+  }
+}
+
+function formatFileSize(bytes) {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+function updateFilesPreview() {
+  filesPreview.innerHTML = '';
+  
+  if (selectedFiles.length === 0) {
+    autoInfo.style.display = 'none';
+    return;
+  }
+  
+  autoInfo.style.display = 'block';
+  
+  selectedFiles.forEach((fileData, index) => {
+    const file = fileData.file;
+    const info = extractDocumentInfoFromFilename(file.name);
+    
+    const card = document.createElement('div');
+    card.className = 'file-card';
+    card.innerHTML = `
+      <div class="file-header">
+        <div class="file-name" title="${file.name}">${file.name}</div>
+        <div class="file-size">${formatFileSize(file.size)}</div>
+      </div>
+      <div class="file-info">
+        <div><strong>Title:</strong> ${info.title}</div>
+        <div><strong>Year:</strong> ${info.year}</div>
+        <div><strong>Category:</strong> ${categoryNames[info.category] || info.category}</div>
+        ${info.actNumber ? `<div><strong>Act/Cap:</strong> ${info.actNumber}</div>` : ''}
+        <div><strong>Pages:</strong> Estimating...</div>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progress-${index}"></div>
+      </div>
+    `;
+    
+    filesPreview.appendChild(card);
+    
+    // Get page count asynchronously
+    getPDFPageCount(file).then(pages => {
+      fileData.pages = pages;
+      fileData.title = info.title;
+      fileData.year = info.year;
+      fileData.category = info.category;
+      fileData.size = (file.size / (1024 * 1024)).toFixed(2); // MB
+      
+      const pageElement = card.querySelector('.file-info div:nth-child(4)');
+      if (pageElement) {
+        pageElement.innerHTML = `<strong>Pages:</strong> ${pages}`;
+      }
+    }).catch(error => {
+      console.error('Error getting page count:', error);
+      fileData.pages = Math.max(1, Math.round(file.size / (50 * 1024)));
+      fileData.title = info.title;
+      fileData.year = info.year;
+      fileData.category = info.category;
+      fileData.size = (file.size / (1024 * 1024)).toFixed(2);
+      
+      const pageElement = card.querySelector('.file-info div:nth-child(4)');
+      if (pageElement) {
+        pageElement.innerHTML = `<strong>Pages:</strong> ${fileData.pages} (estimated)`;
+      }
+    });
+  });
+}
+
+function handleFileSelect(files) {
+  // Clear existing files
+  selectedFiles = [];
+  
+  // Get selected category
+  const categoryRadios = document.querySelectorAll('input[name="category"]');
+  let selectedCategory = 'constitutional';
+  categoryRadios.forEach(radio => {
+    if (radio.checked) selectedCategory = radio.value;
+  });
+  
+  // Process up to 4 files
+  const fileArray = Array.from(files).slice(0, 4);
+  
+  fileArray.forEach(file => {
+    if (file.type === 'application/pdf') {
+      if (file.size > 50 * 1024 * 1024) { // 50MB limit
+        alert(`File "${file.name}" is too large. Maximum size is 50MB.`);
+        return;
+      }
+      
+      const info = extractDocumentInfoFromFilename(file.name);
+      selectedFiles.push({
+        file: file,
+        title: info.title,
+        year: info.year,
+        category: selectedCategory, // Use selected category from form
+        pages: 0, // Will be updated async
+        size: (file.size / (1024 * 1024)).toFixed(2)
+      });
+    } else {
+      alert(`"${file.name}" is not a PDF file. Only PDF files are allowed.`);
+    }
+  });
+  
+  updateFilesPreview();
+  
+  if (selectedFiles.length > 0) {
+    setStatus(`Ready to upload ${selectedFiles.length} PDF file(s)`);
+  }
+}
+
 /* --- TOKEN MODAL FUNCTIONS --- */
 function showTokenModal() {
   tokenModal.style.display = 'flex';
@@ -498,6 +800,23 @@ async function ghPutContents(path, base64Content, message, sha=null, cfg=current
   const r = await fetch(url, { method: "PUT", headers: {...ghHeaders(), "Content-Type":"application/json"}, body: JSON.stringify(body) });
   if (!r.ok) throw new Error(`PUT ${path} failed: ${r.status} ${await r.text()}`);
   return await r.json();
+}
+
+async function uploadPDFFile(file, filename, message, cfg=currentCfg()) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const base64 = btoa(new Uint8Array(reader.result).reduce((data, byte) => data + String.fromCharCode(byte), ''));
+        const result = await ghPutContents(filename, base64, message, null, cfg);
+        resolve(result);
+      } catch (error) {
+        reject(error);
+      }
+    };
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
 }
 
 async function ghDeleteContents(path, message, sha, cfg=currentCfg()){
@@ -613,64 +932,69 @@ function startEdit(doc){
   publishBtn.style.display='none'; 
   updateBtn.style.display='inline-block';
   
-  dTitle.value = doc.title || '';
-  dYear.value = doc.year || new Date().getFullYear();
-  dDesc.value = doc.description || '';
-  dFilename.value = doc.filename || '';
-  dSize.value = doc.size || '';
-  dPages.value = doc.pages || '';
-  dDate.value = doc.date || new Date().toISOString().split('T')[0];
-  dUpdated.checked = doc.updated || false;
+  // Clear file selection when editing
+  selectedFiles = [];
+  updateFilesPreview();
   
-  // Set category radio button
-  const categoryRadios = document.querySelectorAll('input[name="category"]');
-  categoryRadios.forEach(radio => {
-    radio.checked = radio.value === (doc.category || 'constitutional');
-  });
+  // Show editing form with existing data
+  const editForm = document.createElement('div');
+  editForm.innerHTML = `
+    <div style="margin-top:16px; background:#f0f9ff; padding:12px; border-radius:8px;">
+      <h4>Edit Document Details</h4>
+      <div class="row">
+        <div><label>Document Title</label><input id="editTitle" value="${doc.title || ''}"></div>
+        <div><label>Year</label><input id="editYear" type="number" value="${doc.year || new Date().getFullYear()}"></div>
+      </div>
+      <div style="margin-top:8px">
+        <label>Description</label>
+        <textarea id="editDesc" rows="2">${doc.description || ''}</textarea>
+      </div>
+    </div>
+  `;
+  
+  // Replace the upload section with edit form
+  uploadArea.style.display = 'none';
+  autoInfo.style.display = 'none';
+  filesPreview.innerHTML = '';
+  filesPreview.appendChild(editForm);
   
   window.scrollTo({top:0, behavior:'smooth'});
 }
 
 function resetForm(){
   editingId=null; 
-  formTitle.textContent='New Legal Document'; 
+  formTitle.textContent='Upload Legal Documents'; 
   editBadge.style.display='none';
   publishBtn.style.display='inline-block'; 
   updateBtn.style.display='none';
   
-  dTitle.value = "";
-  dYear.value = new Date().getFullYear();
-  dDesc.value = "";
-  dFilename.value = "";
-  dSize.value = "";
-  dPages.value = "";
-  dDate.value = new Date().toISOString().split('T')[0];
-  dUpdated.checked = false;
-  
   // Reset category to constitutional
   const constitutionalRadio = document.querySelector('input[name="category"][value="constitutional"]');
   if (constitutionalRadio) constitutionalRadio.checked = true;
+  
+  // Clear files
+  selectedFiles = [];
+  updateFilesPreview();
+  uploadArea.style.display = 'block';
   
   setStatus('');
 }
 
 resetBtn.addEventListener('click', resetForm);
 
-/* Publish (Create) */
+/* Publish (Create) - UPDATED FOR MULTIPLE FILES */
 publishBtn.addEventListener('click', async ()=>{
   try{
     if (!getToken()){ alert("Set your GitHub token first."); return; }
-    const title = dTitle.value.trim(); 
-    if (!title){ alert("Enter document title."); return; }
-    if (!dFilename.value.trim()){ alert("Enter PDF filename."); return; }
+    if (selectedFiles.length === 0){ alert("Please select PDF files to upload."); return; }
 
     // verify token once
     const ok = await verifyTokenAccess(); 
     if (!ok){ alert("Token not authorized for this repo."); return; }
 
     const cfg = currentCfg();
-    setStatus("Creating document…"); 
-    log("=== Starting document creation ===");
+    setStatus("Starting upload process…"); 
+    log("=== Starting document upload ===");
     
     // Get selected category
     const categoryRadios = document.querySelectorAll('input[name="category"]');
@@ -679,7 +1003,7 @@ publishBtn.addEventListener('click', async ()=>{
       if (radio.checked) selectedCategory = radio.value;
     });
 
-    setStatus("Updating documents.json…");
+    setStatus("Loading existing documents…");
     let arr = []; 
     let sha = null;
     const got = await ghGetContents(cfg.documentsPath, cfg);
@@ -689,69 +1013,141 @@ publishBtn.addEventListener('click', async ()=>{
         arr = JSON.parse(fromBase64Utf8(got.content)); 
         if(!Array.isArray(arr)) arr=[]; 
       }catch{ arr=[]; } 
-      log("Loaded existing documents.json"); 
+      log(`Loaded ${arr.length} existing documents`); 
     }
 
-    // Generate new ID
-    const newId = arr.length > 0 ? Math.max(...arr.map(d => d.id)) + 1 : 1;
+    // Generate new IDs
+    let nextId = arr.length > 0 ? Math.max(...arr.map(d => d.id)) + 1 : 1;
     
-    const document = { 
-      id: newId, 
-      title: title,
-      description: dDesc.value.trim(),
-      filename: dFilename.value.trim(),
-      category: selectedCategory,
-      size: dSize.value.trim(),
-      pages: parseInt(dPages.value) || 0,
-      date: dDate.value,
-      updated: dUpdated.checked,
-      year: parseInt(dYear.value) || new Date().getFullYear()
-    };
+    const newDocuments = [];
+    const uploadedFiles = [];
     
-    arr.push(document);
-
+    // Process each file
+    for (let i = 0; i < selectedFiles.length; i++) {
+      const fileData = selectedFiles[i];
+      const file = fileData.file;
+      
+      // Update progress
+      const progressBar = document.getElementById(`progress-${i}`);
+      if (progressBar) {
+        progressBar.style.width = '30%';
+      }
+      
+      setStatus(`Uploading ${file.name} (${i+1}/${selectedFiles.length})…`);
+      log(`Uploading PDF: ${file.name}`);
+      
+      try {
+        // Upload PDF file to GitHub
+        const uploadResult = await uploadPDFFile(
+          file,
+          file.name,
+          `Add PDF: ${fileData.title}`,
+          cfg
+        );
+        
+        uploadedFiles.push({
+          filename: file.name,
+          title: fileData.title,
+          url: uploadResult.content.html_url
+        });
+        
+        if (progressBar) {
+          progressBar.style.width = '60%';
+        }
+        
+        // Create document entry
+        const document = { 
+          id: nextId++,
+          title: fileData.title,
+          description: `Legal document: ${fileData.title}. Uploaded on ${new Date().toLocaleDateString()}.`,
+          filename: file.name,
+          category: selectedCategory,
+          size: fileData.size,
+          pages: fileData.pages,
+          date: new Date().toISOString().split('T')[0],
+          updated: false,
+          year: fileData.year
+        };
+        
+        newDocuments.push(document);
+        
+        if (progressBar) {
+          progressBar.style.width = '90%';
+        }
+        
+        log(`✓ Uploaded: ${file.name}`);
+      } catch (error) {
+        log(`✗ Failed to upload ${file.name}: ${error.message}`);
+        alert(`Failed to upload ${file.name}. Please try again.`);
+        if (progressBar) {
+          progressBar.style.width = '0%';
+        }
+        return;
+      }
+    }
+    
+    // Add all new documents to array
+    arr.push(...newDocuments);
+    
+    setStatus("Updating documents.json…");
+    
+    // Update documents.json
     await ghPutContents(
       cfg.documentsPath, 
       toBase64Utf8(JSON.stringify(arr,null,2)), 
-      `Add document: ${document.title}`, 
+      `Add ${newDocuments.length} document(s): ${newDocuments.map(d => d.title).join(', ')}`, 
       sha||undefined, 
       cfg
     );
-    log("✓ documents.json updated on GitHub");
     
-    setStatus("Done! Document published.");
+    log(`✓ documents.json updated with ${newDocuments.length} new document(s)`);
+    
+    // Complete progress bars
+    selectedFiles.forEach((_, i) => {
+      const progressBar = document.getElementById(`progress-${i}`);
+      if (progressBar) {
+        progressBar.style.width = '100%';
+      }
+    });
+    
+    setStatus(`Successfully uploaded ${newDocuments.length} document(s)!`);
     
     // Show preview
     previewEl.innerHTML = '';
-    const it = document.createElement('div'); 
-    it.className='item';
-    it.innerHTML = `
-      <div><strong>${document.title}</strong> — ${categoryNames[document.category]||document.category}</div>
-      <div class="muted small">${document.description||''}</div>
-      <div class="muted small">Filename: ${document.filename} • Size: ${document.size}MB • Pages: ${document.pages}</div>
-    `;
-    previewEl.appendChild(it);
+    newDocuments.forEach(doc => {
+      const it = document.createElement('div'); 
+      it.className='item';
+      it.innerHTML = `
+        <div><strong>${doc.title}</strong> — ${categoryNames[doc.category]||doc.category}</div>
+        <div class="muted small">${doc.description||''}</div>
+        <div class="muted small">Filename: ${doc.filename} • Size: ${doc.size}MB • Pages: ${doc.pages}</div>
+      `;
+      previewEl.appendChild(it);
+    });
 
-    alert("Published successfully!");
+    alert(`Successfully uploaded ${newDocuments.length} document(s)!`);
     await refreshDocumentsList();
     resetForm();
   }catch(err){ 
     console.error(err); 
     log(String(err)); 
     setStatus("Error: " + err.message); 
-    alert("Publish failed:\n" + err.message); 
+    alert("Upload failed:\n" + err.message); 
   }
 });
 
-/* Update (Edit) */
+/* Update (Edit) - Updated for file editing */
 updateBtn.addEventListener('click', async ()=>{
   try{
     if (!editingId){ alert('Nothing to update.'); return; }
     if (!getToken()){ alert("Set your GitHub token first."); return; }
     if (!(await verifyTokenAccess())){ alert("Token not authorized for this repo."); return; }
-    const title = dTitle.value.trim(); 
+    
+    const title = document.getElementById('editTitle')?.value?.trim();
+    const year = document.getElementById('editYear')?.value;
+    const description = document.getElementById('editDesc')?.value?.trim();
+    
     if (!title){ alert("Enter document title."); return; }
-    if (!dFilename.value.trim()){ alert("Enter PDF filename."); return; }
 
     const cfg = currentCfg();
     setStatus("Updating document…"); 
@@ -771,14 +1167,10 @@ updateBtn.addEventListener('click', async ()=>{
     const updated = { 
       ...arr[idx], 
       title: title,
-      description: dDesc.value.trim(),
-      filename: dFilename.value.trim(),
+      description: description || arr[idx].description,
       category: selectedCategory,
-      size: dSize.value.trim(),
-      pages: parseInt(dPages.value) || 0,
-      date: dDate.value,
-      updated: dUpdated.checked,
-      year: parseInt(dYear.value) || new Date().getFullYear()
+      year: parseInt(year) || arr[idx].year,
+      updated: true
     };
     
     arr[idx] = updated;
@@ -918,6 +1310,41 @@ importInput.addEventListener('change', async (e)=>{
   }
 });
 
+/* File upload event listeners */
+uploadArea.addEventListener('click', () => {
+  pdfInput.click();
+});
+
+pdfInput.addEventListener('change', (e) => {
+  if (e.target.files.length > 4) {
+    alert('Maximum 4 files allowed. Only the first 4 will be processed.');
+  }
+  handleFileSelect(e.target.files);
+});
+
+// Drag and drop support
+uploadArea.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  uploadArea.classList.add('dragover');
+});
+
+uploadArea.addEventListener('dragleave', (e) => {
+  e.preventDefault();
+  uploadArea.classList.remove('dragover');
+});
+
+uploadArea.addEventListener('drop', (e) => {
+  e.preventDefault();
+  uploadArea.classList.remove('dragover');
+  
+  if (e.dataTransfer.files.length > 0) {
+    if (e.dataTransfer.files.length > 4) {
+      alert('Maximum 4 files allowed. Only the first 4 will be processed.');
+    }
+    handleFileSelect(e.dataTransfer.files);
+  }
+});
+
 /* Token / Session buttons */
 setTokenBtn.addEventListener('click', showTokenModal);
 
@@ -970,13 +1397,6 @@ document.addEventListener('keydown', (e) => {
 
 [cfgOwner,cfgRepo,cfgBranch,cfgDocuments].forEach(el=>{
   el.addEventListener('change', ()=> saveCfg(currentCfg()));
-});
-
-/* Set today's date as default */
-window.addEventListener('load', () => {
-  if (!dDate.value) {
-    dDate.value = new Date().toISOString().split('T')[0];
-  }
 });
 
 /* Init */
