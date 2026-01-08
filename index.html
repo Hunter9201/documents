@@ -235,6 +235,57 @@
     transition: width 0.3s;
   }
   
+  /* GitHub Pages status indicator */
+  .pages-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    margin-left: 8px;
+  }
+  
+  .pages-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  
+  .pages-dot.active {
+    background-color: var(--ok);
+  }
+  
+  .pages-dot.inactive {
+    background-color: var(--muted);
+  }
+  
+  /* Publish section styles */
+  .publish-section {
+    margin-top: 16px;
+    padding: 12px;
+    background: #f0f9ff;
+    border: 1px solid #bae6fd;
+    border-radius: 8px;
+  }
+  
+  .publish-section h4 {
+    margin: 0 0 8px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .publish-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  
+  .publish-checkbox input {
+    width: auto;
+  }
+  
   @media (max-width:900px){ 
     .grid{grid-template-columns:1fr}
     .files-preview{grid-template-columns:1fr}
@@ -254,6 +305,10 @@
       <button id="setSessionBtn" class="button">Use Session</button>
       <button id="clearTokenBtn" class="button bad">Clear Token</button>
       <span id="tokenState" class="tag">No token</span>
+      <span id="pagesStatus" class="pages-status" style="display:none">
+        <span class="pages-dot"></span>
+        <span>Pages</span>
+      </span>
     </div>
   </div>
 </header>
@@ -274,7 +329,8 @@
       <textarea id="tokenInput" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
       <div class="muted small" style="margin-top: 6px;">
         • Token is saved locally (or in session if enabled)<br>
-        • Never share your token with anyone
+        • Never share your token with anyone<br>
+        • Required permissions: repo, workflow
       </div>
     </div>
     <div class="footer">
@@ -297,7 +353,10 @@
         <div><label>Branch</label><input id="cfgBranch" placeholder="main"></div>
         <div><label>Documents JSON path</label><input id="cfgDocuments" placeholder="documents.json"></div>
       </div>
-      <div class="muted small" style="margin-top:6px">Values are saved locally (or in session mode if enabled).</div>
+      <div class="muted small" style="margin-top:6px">
+        Values are saved locally (or in session mode if enabled).<br>
+        After uploading documents, they will be automatically published to: <strong>https://hunter9201.github.io/advocate/</strong>
+      </div>
     </div>
   </div>
 
@@ -346,6 +405,29 @@
           </div>
         </div>
 
+        <!-- GitHub Pages Publish Section -->
+        <div id="publishSection" class="publish-section" style="display:none;">
+          <h4>
+            <span>🚀 GitHub Pages Publishing</span>
+            <span id="pagesIndicator" class="pages-status">
+              <span class="pages-dot inactive"></span>
+              <span>Checking...</span>
+            </span>
+          </h4>
+          <div class="publish-checkbox">
+            <input type="checkbox" id="autoPublish" checked>
+            <label for="autoPublish"><strong>Automatically publish to https://hunter9201.github.io/advocate/</strong></label>
+          </div>
+          <div class="muted small">
+            When enabled, documents will be automatically published to GitHub Pages after upload.
+            You can also trigger manual publishing below.
+          </div>
+          <div class="bar" style="margin-top:8px">
+            <button id="publishPagesBtn" class="button primary">Publish to GitHub Pages Now</button>
+            <button id="checkPagesBtn" class="button">Check Status</button>
+          </div>
+        </div>
+
         <div class="bar" style="margin-top:14px">
           <button id="publishBtn" class="button primary" type="button">Upload to GitHub</button>
           <button id="updateBtn" class="button ok" type="button" style="display:none">Update Document</button>
@@ -368,6 +450,15 @@
         </div>
         <div id="docList" class="list"></div>
 
+        <h3 style="margin:16px 0 10px">GitHub Pages Status</h3>
+        <div id="pagesInfo" class="list">
+          <div class="item">
+            <div><strong>Target URL:</strong> https://hunter9201.github.io/advocate/</div>
+            <div class="muted small" id="pagesStatusText">Checking GitHub Pages status...</div>
+            <div class="muted small" id="pagesLastDeployed">Last deployment: Unknown</div>
+          </div>
+        </div>
+
         <h3 style="margin:16px 0 10px">Last Action</h3>
         <div id="preview" class="list"></div>
 
@@ -381,17 +472,19 @@
 <script>
 /* ===========================
    Uganda Legal Documents Admin Panel
+   Enhanced with GitHub Pages Publishing
    =========================== */
 
 /* --- STORAGE KEYS --- */
 const TOKEN_KEY = "UGANDA_LEGAL_GH_TOKEN_V1";
 const CFG_KEY   = "UGANDA_LEGAL_ADMIN_CFG_V1";
 const SESSION_ONLY_KEY = "UGANDA_LEGAL_SESSION_ONLY";
+const AUTO_PUBLISH_KEY = "UGANDA_LEGAL_AUTO_PUBLISH";
 
 /* --- DEFAULT CONFIG --- */
 const defaultCfg = {
-  owner: "your-username",
-  repo: "uganda-legal-docs",
+  owner: "hunter9201",
+  repo: "advocate",
   branch: "main",
   documentsPath: "documents.json"
 };
@@ -416,6 +509,14 @@ const categoryNames = {
 
 /* --- DOM REFS --- */
 const tokenState = document.getElementById('tokenState');
+const pagesStatus = document.getElementById('pagesStatus');
+const pagesIndicator = document.getElementById('pagesIndicator');
+const pagesStatusText = document.getElementById('pagesStatusText');
+const pagesLastDeployed = document.getElementById('pagesLastDeployed');
+const publishSection = document.getElementById('publishSection');
+const autoPublishCheckbox = document.getElementById('autoPublish');
+const publishPagesBtn = document.getElementById('publishPagesBtn');
+const checkPagesBtn = document.getElementById('checkPagesBtn');
 const setTokenBtn = document.getElementById('setTokenBtn');
 const setSessionBtn = document.getElementById('setSessionBtn');
 const clearTokenBtn = document.getElementById('clearTokenBtn');
@@ -458,6 +559,8 @@ const autoInfo = document.getElementById('autoInfo');
 /* --- STATE --- */
 let editingId = null; // id being edited
 let selectedFiles = []; // Array of {file, title, year, size, pages}
+let pagesEnabled = false;
+let lastDeploymentTime = null;
 
 /* --- HELPERS --- */
 const API_BASE = "https://api.github.com";
@@ -476,11 +579,23 @@ function saveCfg(cfg){ storage().setItem(CFG_KEY, JSON.stringify(cfg)); }
 function loadCfg(){ try{ return {...defaultCfg, ...JSON.parse(storage().getItem(CFG_KEY)||"{}")}; }catch{ return {...defaultCfg}; } }
 function setToken(tok){ storage().setItem(TOKEN_KEY, tok); tokenOk(); }
 function getToken(){ return storage().getItem(TOKEN_KEY) || ""; }
+function getAutoPublish(){ return localStorage.getItem(AUTO_PUBLISH_KEY) !== 'false'; }
+function setAutoPublish(enabled){ localStorage.setItem(AUTO_PUBLISH_KEY, enabled.toString()); }
 
 function tokenOk(stateText){
   const t = getToken();
   tokenState.textContent = stateText || (t ? (useSession()? "Token (session)":"Token set") : "No token");
   tokenState.style.background = t ? "#dcfce7" : "#1a365d0f";
+  
+  // Show/hide publish section based on token
+  if (t) {
+    publishSection.style.display = 'block';
+    checkGitHubPagesStatus();
+    loadAutoPublishSetting();
+  } else {
+    publishSection.style.display = 'none';
+    pagesStatus.style.display = 'none';
+  }
 }
 
 function currentCfg(){
@@ -516,17 +631,11 @@ function ghHeaders(){
 function extractDocumentInfoFromFilename(filename) {
   // Common patterns in Uganda legal document names
   const patterns = [
-    // Pattern: "Administration_General_Act_Cap_264.pdf"
     /^(.+?)_(Act|ACT|act)_(Cap|CAP|cap)_(\d+)/i,
-    // Pattern: "Uganda_Penal_Code_Act_Cap_120.pdf"
     /^(.+?)_(Code|CODE|code)_(Act|ACT|act)_(Cap|CAP|cap)_(\d+)/i,
-    // Pattern: "Evidence_Act_Cap_43.pdf"
     /^(.+?)_(Act|ACT|act)_(Cap|CAP|cap)_(\d+)/i,
-    // Pattern: "The_Companies_Act_2012.pdf" or "Companies_Act_2012.pdf"
     /^(.+?)_(Act|ACT|act)_(\d{4})/i,
-    // Pattern: "Contract_Act_2010_No_7.pdf"
     /^(.+?)_(Act|ACT|act)_(\d{4})_.+/i,
-    // Pattern: "Administration_General_Act.pdf"
     /^(.+?)_(Act|ACT|act)/i
   ];
 
@@ -544,7 +653,7 @@ function extractDocumentInfoFromFilename(filename) {
       // Extract title parts
       const parts = nameWithoutExt.split('_');
       
-      // Create readable title (replace underscores with spaces, capitalize first letters)
+      // Create readable title
       title = parts.map(part => {
         if (['Act', 'Cap', 'No', 'The'].includes(part) || /^\d+$/.test(part)) {
           return part.toUpperCase();
@@ -552,7 +661,7 @@ function extractDocumentInfoFromFilename(filename) {
         return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
       }).join(' ');
       
-      // Try to extract year from filename (look for 4-digit numbers)
+      // Try to extract year from filename
       const yearMatch = nameWithoutExt.match(/(\d{4})/);
       if (yearMatch) {
         year = parseInt(yearMatch[1]);
@@ -617,15 +726,12 @@ function readFileAsArrayBuffer(file) {
 
 async function getPDFPageCount(file) {
   try {
-    // Try to use PDF.js to get page count
+    // Load PDF.js dynamically if needed
     if (typeof pdfjsLib === 'undefined') {
-      // Load PDF.js dynamically
-      await new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-        script.onload = resolve;
-        script.onerror = reject;
-        document.head.appendChild(script);
+      return new Promise((resolve) => {
+        // Estimate pages based on file size (rough estimate: 50KB per page)
+        const estimatedPages = Math.max(1, Math.round(file.size / (50 * 1024)));
+        resolve(estimatedPages);
       });
     }
 
@@ -635,7 +741,7 @@ async function getPDFPageCount(file) {
     return pdf.numPages;
   } catch (error) {
     console.warn('Could not get PDF page count:', error);
-    // Estimate pages based on file size (rough estimate: 50KB per page)
+    // Estimate pages based on file size
     const estimatedPages = Math.max(1, Math.round(file.size / (50 * 1024)));
     return estimatedPages;
   }
@@ -738,8 +844,8 @@ function handleFileSelect(files) {
         file: file,
         title: info.title,
         year: info.year,
-        category: selectedCategory, // Use selected category from form
-        pages: 0, // Will be updated async
+        category: selectedCategory,
+        pages: 0,
         size: (file.size / (1024 * 1024)).toFixed(2)
       });
     } else {
@@ -754,37 +860,183 @@ function handleFileSelect(files) {
   }
 }
 
-/* --- TOKEN MODAL FUNCTIONS --- */
-function showTokenModal() {
-  tokenModal.style.display = 'flex';
-  tokenInput.value = '';
-  setTimeout(() => {
-    tokenInput.focus();
-    tokenModal.scrollTop = 0;
-  }, 100);
-}
-
-function hideTokenModal() {
-  tokenModal.style.display = 'none';
-  tokenInput.value = '';
-}
-
-async function saveTokenFromModal() {
-  const token = tokenInput.value.trim();
-  if (!token) {
-    alert("Please enter a GitHub token.");
-    return;
+/* --- GITHUB PAGES FUNCTIONS --- */
+async function checkGitHubPagesStatus() {
+  try {
+    const cfg = currentCfg();
+    const url = `${API_BASE}/repos/${cfg.owner}/${cfg.repo}/pages`;
+    const response = await fetch(url, { headers: ghHeaders() });
+    
+    if (response.ok) {
+      const data = await response.json();
+      pagesEnabled = data.status === 'built' || data.status === 'building';
+      
+      // Update UI
+      const dot = pagesIndicator.querySelector('.pages-dot');
+      dot.className = pagesEnabled ? 'pages-dot active' : 'pages-dot inactive';
+      pagesIndicator.querySelector('span:nth-child(2)').textContent = 
+        pagesEnabled ? 'Pages Active' : 'Pages Inactive';
+      
+      pagesStatusText.textContent = pagesEnabled ? 
+        `GitHub Pages is ${data.status}. Site URL: ${data.html_url || 'https://hunter9201.github.io/advocate/'}` :
+        `GitHub Pages is not enabled. Enable it in repository settings.`;
+      
+      // Show/hide pages status in header
+      pagesStatus.style.display = 'inline-flex';
+      const headerDot = pagesStatus.querySelector('.pages-dot');
+      headerDot.className = pagesEnabled ? 'pages-dot active' : 'pages-dot inactive';
+      
+      // Get deployment status
+      await getLastDeployment();
+      
+      return pagesEnabled;
+    } else {
+      pagesIndicator.querySelector('.pages-dot').className = 'pages-dot inactive';
+      pagesIndicator.querySelector('span:nth-child(2)').textContent = 'Pages Not Enabled';
+      pagesStatusText.textContent = 'GitHub Pages is not enabled for this repository.';
+      pagesEnabled = false;
+      return false;
+    }
+  } catch (error) {
+    console.error('Error checking GitHub Pages:', error);
+    pagesIndicator.querySelector('.pages-dot').className = 'pages-dot inactive';
+    pagesIndicator.querySelector('span:nth-child(2)').textContent = 'Error';
+    pagesStatusText.textContent = 'Error checking GitHub Pages status.';
+    pagesEnabled = false;
+    return false;
   }
-  
-  setToken(token);
-  hideTokenModal();
-  
-  setStatus("Testing token…");
-  const ok = await verifyTokenAccess();
-  setStatus(ok ? "Token OK" : "Token invalid for repo");
 }
 
-/* GitHub API */
+async function getLastDeployment() {
+  try {
+    const cfg = currentCfg();
+    const url = `${API_BASE}/repos/${cfg.owner}/${cfg.repo}/deployments`;
+    const response = await fetch(url, { headers: ghHeaders() });
+    
+    if (response.ok) {
+      const deployments = await response.json();
+      if (deployments.length > 0) {
+        const latest = deployments[0];
+        lastDeploymentTime = latest.created_at;
+        const date = new Date(latest.created_at);
+        pagesLastDeployed.textContent = `Last deployment: ${date.toLocaleString()}`;
+      } else {
+        pagesLastDeployed.textContent = 'Last deployment: Never deployed';
+      }
+    }
+  } catch (error) {
+    console.error('Error getting deployments:', error);
+    pagesLastDeployed.textContent = 'Last deployment: Unknown';
+  }
+}
+
+async function triggerGitHubPagesDeployment(message = "Deploy to GitHub Pages") {
+  try {
+    const cfg = currentCfg();
+    
+    // First, update a deployment marker file
+    const deployMarkerPath = '.github/deploy-trigger.json';
+    const deployMarker = {
+      last_deployment: new Date().toISOString(),
+      trigger: message
+    };
+    
+    // Check if file exists
+    let sha = null;
+    try {
+      const existing = await ghGetContents(deployMarkerPath, cfg);
+      if (existing.sha) sha = existing.sha;
+    } catch {
+      // File doesn't exist, that's ok
+    }
+    
+    // Create or update the marker file
+    await ghPutContents(
+      deployMarkerPath,
+      toBase64Utf8(JSON.stringify(deployMarker, null, 2)),
+      `🚀 ${message}`,
+      sha || undefined,
+      cfg
+    );
+    
+    log(`✓ Triggered GitHub Pages deployment: ${message}`);
+    return true;
+  } catch (error) {
+    console.error('Error triggering deployment:', error);
+    log(`✗ Failed to trigger deployment: ${error.message}`);
+    return false;
+  }
+}
+
+async function createGitHubPagesWorkflow() {
+  try {
+    const cfg = currentCfg();
+    const workflowPath = '.github/workflows/deploy-to-pages.yml';
+    
+    const workflowContent = `name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+  repository_dispatch:
+    types: [deploy-pages]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: \${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup Pages
+        uses: actions/configure-pages@v4
+      
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+      
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+`;
+
+    await ghPutContents(
+      workflowPath,
+      toBase64Utf8(workflowContent),
+      'Add GitHub Pages deployment workflow',
+      null,
+      cfg
+    );
+    
+    log('✓ Created GitHub Pages deployment workflow');
+    return true;
+  } catch (error) {
+    console.error('Error creating workflow:', error);
+    log(`✗ Failed to create workflow: ${error.message}`);
+    return false;
+  }
+}
+
+function loadAutoPublishSetting() {
+  const enabled = getAutoPublish();
+  autoPublishCheckbox.checked = enabled;
+}
+
+/* --- GITHUB API FUNCTIONS --- */
 async function ghGetContents(path, cfg=currentCfg()){
   const url = `${API_BASE}/repos/${cfg.owner}/${cfg.repo}/contents/${encodeURIComponent(path)}?ref=${encodeURIComponent(cfg.branch)}`;
   const r = await fetch(url, {headers: ghHeaders()});
@@ -799,6 +1051,13 @@ async function ghPutContents(path, base64Content, message, sha=null, cfg=current
   if (sha) body.sha = sha;
   const r = await fetch(url, { method: "PUT", headers: {...ghHeaders(), "Content-Type":"application/json"}, body: JSON.stringify(body) });
   if (!r.ok) throw new Error(`PUT ${path} failed: ${r.status} ${await r.text()}`);
+  return await r.json();
+}
+
+async function ghDeleteContents(path, message, sha, cfg=currentCfg()){
+  const url = `${API_BASE}/repos/${cfg.owner}/${cfg.repo}/contents/${encodeURIComponent(path)}`;
+  const r = await fetch(url, { method: "DELETE", headers: {...ghHeaders(), "Content-Type":"application/json"}, body: JSON.stringify({ message, sha, branch: cfg.branch }) });
+  if (!r.ok) throw new Error(`DELETE ${path} failed: ${r.status} ${await r.text()}`);
   return await r.json();
 }
 
@@ -819,13 +1078,6 @@ async function uploadPDFFile(file, filename, message, cfg=currentCfg()) {
   });
 }
 
-async function ghDeleteContents(path, message, sha, cfg=currentCfg()){
-  const url = `${API_BASE}/repos/${cfg.owner}/${cfg.repo}/contents/${encodeURIComponent(path)}`;
-  const r = await fetch(url, { method: "DELETE", headers: {...ghHeaders(), "Content-Type":"application/json"}, body: JSON.stringify({ message, sha, branch: cfg.branch }) });
-  if (!r.ok) throw new Error(`DELETE ${path} failed: ${r.status} ${await r.text()}`);
-  return await r.json();
-}
-
 /* Token quick test */
 async function verifyTokenAccess(){
   try{
@@ -833,6 +1085,7 @@ async function verifyTokenAccess(){
     const r = await fetch(`${API_BASE}/repos/${cfg.owner}/${cfg.repo}`, {headers: ghHeaders()});
     if (!r.ok) { tokenOk("Token invalid for repo"); return false; }
     tokenOk("Token OK");
+    await checkGitHubPagesStatus();
     return true;
   }catch{
     tokenOk("Token check failed");
@@ -918,6 +1171,9 @@ function renderDocumentsAdmin(arr){
     filenameDiv.className='muted small'; 
     filenameDiv.style.marginTop='4px';
     filenameDiv.textContent = `Filename: ${doc.filename}`;
+    if (doc.url) {
+      filenameDiv.innerHTML += ` • <a href="${doc.url}" target="_blank">View on GitHub Pages</a>`;
+    }
     item.appendChild(filenameDiv);
     
     docList.appendChild(item);
@@ -935,8 +1191,10 @@ function startEdit(doc){
   // Clear file selection when editing
   selectedFiles = [];
   updateFilesPreview();
+  uploadArea.style.display = 'none';
+  autoInfo.style.display = 'none';
   
-  // Show editing form with existing data
+  // Create edit form
   const editForm = document.createElement('div');
   editForm.innerHTML = `
     <div style="margin-top:16px; background:#f0f9ff; padding:12px; border-radius:8px;">
@@ -949,12 +1207,20 @@ function startEdit(doc){
         <label>Description</label>
         <textarea id="editDesc" rows="2">${doc.description || ''}</textarea>
       </div>
+      <div style="margin-top:8px">
+        <label>Category</label>
+        <div class="categories-grid" id="editCategories">
+          ${Object.entries(categoryNames).map(([value, name]) => `
+            <div class="category-option">
+              <input type="radio" name="editCategory" value="${value}" ${doc.category === value ? 'checked' : ''}>
+              ${name}
+            </div>
+          `).join('')}
+        </div>
+      </div>
     </div>
   `;
   
-  // Replace the upload section with edit form
-  uploadArea.style.display = 'none';
-  autoInfo.style.display = 'none';
   filesPreview.innerHTML = '';
   filesPreview.appendChild(editForm);
   
@@ -982,161 +1248,7 @@ function resetForm(){
 
 resetBtn.addEventListener('click', resetForm);
 
-/* Publish (Create) - UPDATED FOR MULTIPLE FILES */
-publishBtn.addEventListener('click', async ()=>{
-  try{
-    if (!getToken()){ alert("Set your GitHub token first."); return; }
-    if (selectedFiles.length === 0){ alert("Please select PDF files to upload."); return; }
-
-    // verify token once
-    const ok = await verifyTokenAccess(); 
-    if (!ok){ alert("Token not authorized for this repo."); return; }
-
-    const cfg = currentCfg();
-    setStatus("Starting upload process…"); 
-    log("=== Starting document upload ===");
-    
-    // Get selected category
-    const categoryRadios = document.querySelectorAll('input[name="category"]');
-    let selectedCategory = 'constitutional';
-    categoryRadios.forEach(radio => {
-      if (radio.checked) selectedCategory = radio.value;
-    });
-
-    setStatus("Loading existing documents…");
-    let arr = []; 
-    let sha = null;
-    const got = await ghGetContents(cfg.documentsPath, cfg);
-    if (got.status !== 404){ 
-      sha = got.sha; 
-      try{ 
-        arr = JSON.parse(fromBase64Utf8(got.content)); 
-        if(!Array.isArray(arr)) arr=[]; 
-      }catch{ arr=[]; } 
-      log(`Loaded ${arr.length} existing documents`); 
-    }
-
-    // Generate new IDs
-    let nextId = arr.length > 0 ? Math.max(...arr.map(d => d.id)) + 1 : 1;
-    
-    const newDocuments = [];
-    const uploadedFiles = [];
-    
-    // Process each file
-    for (let i = 0; i < selectedFiles.length; i++) {
-      const fileData = selectedFiles[i];
-      const file = fileData.file;
-      
-      // Update progress
-      const progressBar = document.getElementById(`progress-${i}`);
-      if (progressBar) {
-        progressBar.style.width = '30%';
-      }
-      
-      setStatus(`Uploading ${file.name} (${i+1}/${selectedFiles.length})…`);
-      log(`Uploading PDF: ${file.name}`);
-      
-      try {
-        // Upload PDF file to GitHub
-        const uploadResult = await uploadPDFFile(
-          file,
-          file.name,
-          `Add PDF: ${fileData.title}`,
-          cfg
-        );
-        
-        uploadedFiles.push({
-          filename: file.name,
-          title: fileData.title,
-          url: uploadResult.content.html_url
-        });
-        
-        if (progressBar) {
-          progressBar.style.width = '60%';
-        }
-        
-        // Create document entry
-        const document = { 
-          id: nextId++,
-          title: fileData.title,
-          description: `Legal document: ${fileData.title}. Uploaded on ${new Date().toLocaleDateString()}.`,
-          filename: file.name,
-          category: selectedCategory,
-          size: fileData.size,
-          pages: fileData.pages,
-          date: new Date().toISOString().split('T')[0],
-          updated: false,
-          year: fileData.year
-        };
-        
-        newDocuments.push(document);
-        
-        if (progressBar) {
-          progressBar.style.width = '90%';
-        }
-        
-        log(`✓ Uploaded: ${file.name}`);
-      } catch (error) {
-        log(`✗ Failed to upload ${file.name}: ${error.message}`);
-        alert(`Failed to upload ${file.name}. Please try again.`);
-        if (progressBar) {
-          progressBar.style.width = '0%';
-        }
-        return;
-      }
-    }
-    
-    // Add all new documents to array
-    arr.push(...newDocuments);
-    
-    setStatus("Updating documents.json…");
-    
-    // Update documents.json
-    await ghPutContents(
-      cfg.documentsPath, 
-      toBase64Utf8(JSON.stringify(arr,null,2)), 
-      `Add ${newDocuments.length} document(s): ${newDocuments.map(d => d.title).join(', ')}`, 
-      sha||undefined, 
-      cfg
-    );
-    
-    log(`✓ documents.json updated with ${newDocuments.length} new document(s)`);
-    
-    // Complete progress bars
-    selectedFiles.forEach((_, i) => {
-      const progressBar = document.getElementById(`progress-${i}`);
-      if (progressBar) {
-        progressBar.style.width = '100%';
-      }
-    });
-    
-    setStatus(`Successfully uploaded ${newDocuments.length} document(s)!`);
-    
-    // Show preview
-    previewEl.innerHTML = '';
-    newDocuments.forEach(doc => {
-      const it = document.createElement('div'); 
-      it.className='item';
-      it.innerHTML = `
-        <div><strong>${doc.title}</strong> — ${categoryNames[doc.category]||doc.category}</div>
-        <div class="muted small">${doc.description||''}</div>
-        <div class="muted small">Filename: ${doc.filename} • Size: ${doc.size}MB • Pages: ${doc.pages}</div>
-      `;
-      previewEl.appendChild(it);
-    });
-
-    alert(`Successfully uploaded ${newDocuments.length} document(s)!`);
-    await refreshDocumentsList();
-    resetForm();
-  }catch(err){ 
-    console.error(err); 
-    log(String(err)); 
-    setStatus("Error: " + err.message); 
-    alert("Upload failed:\n" + err.message); 
-  }
-});
-
-/* Update (Edit) - Updated for file editing */
+/* Update (Edit) */
 updateBtn.addEventListener('click', async ()=>{
   try{
     if (!editingId){ alert('Nothing to update.'); return; }
@@ -1146,6 +1258,8 @@ updateBtn.addEventListener('click', async ()=>{
     const title = document.getElementById('editTitle')?.value?.trim();
     const year = document.getElementById('editYear')?.value;
     const description = document.getElementById('editDesc')?.value?.trim();
+    const categoryRadio = document.querySelector('input[name="editCategory"]:checked');
+    const category = categoryRadio ? categoryRadio.value : 'constitutional';
     
     if (!title){ alert("Enter document title."); return; }
 
@@ -1157,18 +1271,11 @@ updateBtn.addEventListener('click', async ()=>{
     const idx = arr.findIndex(x=>x.id === editingId);
     if (idx === -1){ alert('Document not found.'); return; }
 
-    // Get selected category
-    const categoryRadios = document.querySelectorAll('input[name="category"]');
-    let selectedCategory = 'constitutional';
-    categoryRadios.forEach(radio => {
-      if (radio.checked) selectedCategory = radio.value;
-    });
-
     const updated = { 
       ...arr[idx], 
       title: title,
       description: description || arr[idx].description,
-      category: selectedCategory,
+      category: category,
       year: parseInt(year) || arr[idx].year,
       updated: true
     };
@@ -1185,7 +1292,15 @@ updateBtn.addEventListener('click', async ()=>{
     
     log("✓ documents.json updated on GitHub");
     setStatus('Updated.');
-    log('documents.json updated.');
+    
+    // Auto-publish to GitHub Pages if enabled
+    if (getAutoPublish() && pagesEnabled) {
+      setStatus("Triggering GitHub Pages deployment…");
+      const deploymentMessage = `Update document: ${updated.title}`;
+      await createGitHubPagesWorkflow();
+      await triggerGitHubPagesDeployment(deploymentMessage);
+      setStatus('Updated and deployment triggered.');
+    }
     
     // Show preview
     previewEl.innerHTML = '';
@@ -1195,6 +1310,7 @@ updateBtn.addEventListener('click', async ()=>{
       <div><strong>${updated.title}</strong> — ${categoryNames[updated.category]||updated.category}</div>
       <div class="muted small">${updated.description||''}</div>
       <div class="muted small">Filename: ${updated.filename} • Size: ${updated.size}MB • Pages: ${updated.pages}</div>
+      ${updated.url ? `<div class="muted small"><a href="${updated.url}" target="_blank">View on GitHub Pages</a></div>` : ''}
     `;
     previewEl.appendChild(it);
 
@@ -1310,6 +1426,244 @@ importInput.addEventListener('change', async (e)=>{
   }
 });
 
+/* --- ENHANCED PUBLISH FUNCTION --- */
+publishBtn.addEventListener('click', async ()=>{
+  try{
+    if (!getToken()){ alert("Set your GitHub token first."); return; }
+    if (selectedFiles.length === 0){ alert("Please select PDF files to upload."); return; }
+
+    // verify token once
+    const ok = await verifyTokenAccess(); 
+    if (!ok){ alert("Token not authorized for this repo."); return; }
+
+    const cfg = currentCfg();
+    setStatus("Starting upload process…"); 
+    log("=== Starting document upload ===");
+    
+    // Get selected category
+    const categoryRadios = document.querySelectorAll('input[name="category"]');
+    let selectedCategory = 'constitutional';
+    categoryRadios.forEach(radio => {
+      if (radio.checked) selectedCategory = radio.value;
+    });
+
+    setStatus("Loading existing documents…");
+    let arr = []; 
+    let sha = null;
+    const got = await ghGetContents(cfg.documentsPath, cfg);
+    if (got.status !== 404){ 
+      sha = got.sha; 
+      try{ 
+        arr = JSON.parse(fromBase64Utf8(got.content)); 
+        if(!Array.isArray(arr)) arr=[]; 
+      }catch{ arr=[]; } 
+      log(`Loaded ${arr.length} existing documents`); 
+    }
+
+    // Generate new IDs
+    let nextId = arr.length > 0 ? Math.max(...arr.map(d => d.id)) + 1 : 1;
+    
+    const newDocuments = [];
+    
+    // Process each file
+    for (let i = 0; i < selectedFiles.length; i++) {
+      const fileData = selectedFiles[i];
+      const file = fileData.file;
+      
+      // Update progress
+      const progressBar = document.getElementById(`progress-${i}`);
+      if (progressBar) {
+        progressBar.style.width = '30%';
+      }
+      
+      setStatus(`Uploading ${file.name} (${i+1}/${selectedFiles.length})…`);
+      log(`Uploading PDF: ${file.name}`);
+      
+      try {
+        // Upload PDF file to GitHub
+        await uploadPDFFile(
+          file,
+          file.name,
+          `Add PDF: ${fileData.title}`,
+          cfg
+        );
+        
+        if (progressBar) {
+          progressBar.style.width = '60%';
+        }
+        
+        // Create document entry
+        const document = { 
+          id: nextId++,
+          title: fileData.title,
+          description: `Legal document: ${fileData.title}. Uploaded on ${new Date().toLocaleDateString()}.`,
+          filename: file.name,
+          category: selectedCategory,
+          size: fileData.size,
+          pages: fileData.pages,
+          date: new Date().toISOString().split('T')[0],
+          updated: false,
+          year: fileData.year,
+          url: `https://hunter9201.github.io/advocate/${encodeURIComponent(file.name)}`
+        };
+        
+        newDocuments.push(document);
+        
+        if (progressBar) {
+          progressBar.style.width = '90%';
+        }
+        
+        log(`✓ Uploaded: ${file.name}`);
+      } catch (error) {
+        log(`✗ Failed to upload ${file.name}: ${error.message}`);
+        alert(`Failed to upload ${file.name}. Please try again.`);
+        if (progressBar) {
+          progressBar.style.width = '0%';
+        }
+        return;
+      }
+    }
+    
+    // Add all new documents to array
+    arr.push(...newDocuments);
+    
+    setStatus("Updating documents.json…");
+    
+    // Update documents.json
+    await ghPutContents(
+      cfg.documentsPath, 
+      toBase64Utf8(JSON.stringify(arr,null,2)), 
+      `Add ${newDocuments.length} document(s): ${newDocuments.map(d => d.title).join(', ')}`, 
+      sha||undefined, 
+      cfg
+    );
+    
+    log(`✓ documents.json updated with ${newDocuments.length} new document(s)`);
+    
+    // Complete progress bars
+    selectedFiles.forEach((_, i) => {
+      const progressBar = document.getElementById(`progress-${i}`);
+      if (progressBar) {
+        progressBar.style.width = '100%';
+      }
+    });
+    
+    setStatus(`Successfully uploaded ${newDocuments.length} document(s)!`);
+    
+    // Show preview
+    previewEl.innerHTML = '';
+    newDocuments.forEach(doc => {
+      const it = document.createElement('div'); 
+      it.className='item';
+      it.innerHTML = `
+        <div><strong>${doc.title}</strong> — ${categoryNames[doc.category]||doc.category}</div>
+        <div class="muted small">${doc.description||''}</div>
+        <div class="muted small">Filename: ${doc.filename} • Size: ${doc.size}MB • Pages: ${doc.pages}</div>
+        <div class="muted small"><a href="${doc.url}" target="_blank">View on GitHub Pages</a></div>
+      `;
+      previewEl.appendChild(it);
+    });
+
+    // Auto-publish to GitHub Pages if enabled
+    if (getAutoPublish() && pagesEnabled) {
+      setStatus("Triggering GitHub Pages deployment…");
+      log("=== Triggering GitHub Pages deployment ===");
+      
+      const deploymentMessage = `Deploy ${newDocuments.length} new document(s): ${newDocuments.map(d => d.title).join(', ')}`;
+      
+      // First, ensure deployment workflow exists
+      await createGitHubPagesWorkflow();
+      
+      // Then trigger deployment
+      const deployed = await triggerGitHubPagesDeployment(deploymentMessage);
+      
+      if (deployed) {
+        log("✓ GitHub Pages deployment triggered successfully");
+        setStatus(`Upload complete! Documents will be available at https://hunter9201.github.io/advocate/ shortly.`);
+        
+        // Show success message
+        const successMsg = document.createElement('div');
+        successMsg.className = 'item';
+        successMsg.style.background = '#f0fdf4';
+        successMsg.style.borderColor = '#bbf7d0';
+        successMsg.innerHTML = `
+          <div><strong>🚀 GitHub Pages Deployment Triggered</strong></div>
+          <div class="muted small">Your documents will be available at:</div>
+          <div><a href="https://hunter9201.github.io/advocate/" target="_blank">https://hunter9201.github.io/advocate/</a></div>
+          <div class="muted small">The deployment usually takes 1-2 minutes to complete.</div>
+        `;
+        previewEl.prepend(successMsg);
+      } else {
+        log("⚠ GitHub Pages deployment failed, but documents were uploaded");
+        alert(`Documents uploaded but GitHub Pages deployment failed. You can trigger it manually from the Publish section.`);
+      }
+    } else if (getAutoPublish() && !pagesEnabled) {
+      alert(`Documents uploaded successfully, but GitHub Pages is not enabled. Enable it in your repository settings to publish to https://hunter9201.github.io/advocate/`);
+    } else {
+      alert(`Successfully uploaded ${newDocuments.length} document(s)!`);
+    }
+    
+    await refreshDocumentsList();
+    resetForm();
+  }catch(err){ 
+    console.error(err); 
+    log(String(err)); 
+    setStatus("Error: " + err.message); 
+    alert("Upload failed:\n" + err.message); 
+  }
+});
+
+/* --- EVENT LISTENERS FOR NEW FEATURES --- */
+autoPublishCheckbox.addEventListener('change', (e) => {
+  setAutoPublish(e.target.checked);
+  log(`Auto-publish ${e.target.checked ? 'enabled' : 'disabled'}`);
+});
+
+publishPagesBtn.addEventListener('click', async () => {
+  try {
+    if (!getToken()) {
+      alert("Set your GitHub token first.");
+      return;
+    }
+    
+    setStatus("Triggering GitHub Pages deployment…");
+    
+    // Check if GitHub Pages is enabled
+    const pagesEnabled = await checkGitHubPagesStatus();
+    if (!pagesEnabled) {
+      alert("GitHub Pages is not enabled for this repository. Enable it in the repository settings first.");
+      return;
+    }
+    
+    // Ensure workflow exists
+    await createGitHubPagesWorkflow();
+    
+    // Trigger deployment
+    const success = await triggerGitHubPagesDeployment("Manual deployment triggered from admin panel");
+    
+    if (success) {
+      setStatus("GitHub Pages deployment triggered successfully!");
+      alert("GitHub Pages deployment triggered successfully! Your site will be updated shortly at https://hunter9201.github.io/advocate/");
+      
+      // Update last deployment time
+      await getLastDeployment();
+    } else {
+      setStatus("Failed to trigger deployment.");
+      alert("Failed to trigger GitHub Pages deployment. Check the logs for details.");
+    }
+  } catch (error) {
+    console.error('Error triggering deployment:', error);
+    setStatus("Error: " + error.message);
+    alert("Failed to trigger deployment: " + error.message);
+  }
+});
+
+checkPagesBtn.addEventListener('click', async () => {
+  setStatus("Checking GitHub Pages status…");
+  await checkGitHubPagesStatus();
+  setStatus("GitHub Pages status updated.");
+});
+
 /* File upload event listeners */
 uploadArea.addEventListener('click', () => {
   pdfInput.click();
@@ -1344,6 +1698,36 @@ uploadArea.addEventListener('drop', (e) => {
     handleFileSelect(e.dataTransfer.files);
   }
 });
+
+/* --- TOKEN MODAL FUNCTIONS --- */
+function showTokenModal() {
+  tokenModal.style.display = 'flex';
+  tokenInput.value = '';
+  setTimeout(() => {
+    tokenInput.focus();
+    tokenModal.scrollTop = 0;
+  }, 100);
+}
+
+function hideTokenModal() {
+  tokenModal.style.display = 'none';
+  tokenInput.value = '';
+}
+
+async function saveTokenFromModal() {
+  const token = tokenInput.value.trim();
+  if (!token) {
+    alert("Please enter a GitHub token.");
+    return;
+  }
+  
+  setToken(token);
+  hideTokenModal();
+  
+  setStatus("Testing token…");
+  const ok = await verifyTokenAccess();
+  setStatus(ok ? "Token OK" : "Token invalid for repo");
+}
 
 /* Token / Session buttons */
 setTokenBtn.addEventListener('click', showTokenModal);
@@ -1386,27 +1770,40 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-/* Config bind + load */
+/* --- INITIALIZATION --- */
 (function initCfg(){
   const cfg = loadCfg();
   cfgOwner.value = cfg.owner;
   cfgRepo.value = cfg.repo;
   cfgBranch.value = cfg.branch;
   cfgDocuments.value = cfg.documentsPath;
+  
+  // Check if token exists and show publish section
+  if (getToken()) {
+    publishSection.style.display = 'block';
+    loadAutoPublishSetting();
+  }
 })();
 
+// Initialize event listeners for config changes
 [cfgOwner,cfgRepo,cfgBranch,cfgDocuments].forEach(el=>{
   el.addEventListener('change', ()=> saveCfg(currentCfg()));
 });
 
-/* Init */
+/* --- STARTUP --- */
 tokenOk();
 refreshBtn.addEventListener('click', refreshDocumentsList);
 refreshDocumentsList();
 
+// Check GitHub Pages status on startup if token exists
+if (getToken()) {
+  setTimeout(() => checkGitHubPagesStatus(), 1000);
+}
+
 /* Initial message */
 log("Uganda Legal Documents Admin Panel initialized");
 log("Set your GitHub token to start managing documents.");
+log("Documents will be automatically published to: https://hunter9201.github.io/advocate/");
 </script>
 </body>
 </html>
